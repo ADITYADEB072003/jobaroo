@@ -1,0 +1,36 @@
+const submitHandler = async (e) => {
+    e.preventDefault();
+
+    try {
+        dispatch(setLoading(true));
+
+        const res = await axios.post(`${USER_API_END_POINT}/login`, input, {
+            headers: {
+                "Content-Type": "application/json"
+            },
+            withCredentials: true,
+        });
+
+        if (res.data.success) {
+            dispatch(setUser(res.data.user));  // Save user data in the state
+
+            // Check user role and redirect accordingly
+            if (res.data.user.role === 'admin') {
+                navigate('/admin/companies');  // Redirect to the admin dashboard
+            } else if (res.data.user.role === 'recruiter') {
+                navigate('/recruiter/dashboard');  // Redirect to the recruiter dashboard
+            } else if (res.data.user.role === 'student') {
+                navigate('/student/dashboard');  // Redirect to the student dashboard
+            } else {
+                navigate('/');  // Default redirect (home page) if role is unrecognized
+            }
+
+            toast.success(res.data.message);
+        }
+    } catch (error) {
+        console.log(error);
+        toast.error(error.response.data.message);
+    } finally {
+        dispatch(setLoading(false));
+    }
+};

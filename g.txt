@@ -1,0 +1,252 @@
+import React, { useState, useEffect } from "react";
+import Navbar from "../shared/Navbar";
+import { Button } from "../ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { Label } from "../ui/label";
+import { getAllUsers, getAllCompanies, getAllJobs, removeCompany, acceptOrRejectCompany } from "../admin/api"; // Import API functions
+
+const AdminHomePage = () => {
+    const [selectedOption, setSelectedOption] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [companies, setCompanies] = useState([]);
+    const [jobs, setJobs] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [companyToRemove, setCompanyToRemove] = useState(null); // Track company to remove
+
+    const handleSelect = (value) => {
+        setSelectedOption(value);
+    };
+
+    const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            if (selectedOption === "student") {
+                const response = await getAllUsers();
+                if (response && Array.isArray(response.users)) {
+                    setUsers(response.users);
+                } else {
+                    throw new Error("Invalid response structure for users");
+                }
+            } else if (selectedOption === "recruiter") {
+                const response = await getAllJobs();
+                if (response && Array.isArray(response.jobs)) {
+                    setJobs(response.jobs);
+                } else {
+                    throw new Error("Invalid response structure for jobs");
+                }
+            } else if (selectedOption === "companies") {
+                const response = await getAllCompanies();
+                if (response && Array.isArray(response.companies)) {
+                    setCompanies(response.companies);
+                } else {
+                    throw new Error("Invalid response structure for companies");
+                }
+            }
+        } catch (error) {
+            setError("Failed to load data. Please try again later.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemoveCompany = async (companyId) => {
+        setCompanyToRemove(companyId);
+        setIsModalOpen(true); // Open confirmation modal
+    };
+
+    const confirmRemove = async () => {
+        if (companyToRemove) {
+            try {
+                await removeCompany(companyToRemove); // Remove company via API
+                setCompanies((prev) => prev.filter((company) => company._id !== companyToRemove)); // Update state
+            } catch (error) {
+                setError("Failed to remove company. Please try again later.");
+            }
+        }
+        setIsModalOpen(false); // Close modal after confirmation
+        setCompanyToRemove(null); // Clear company to remove
+    };
+
+    const handleAcceptOrRejectCompany = async (companyId, action) => {
+        try {
+            await acceptOrRejectCompany(companyId, action);
+            setCompanies((prev) => prev.map((company) =>
+                company._id === companyId ? { ...company, status: action } : company
+            ));
+        } catch (error) {
+            setError(`Failed to ${action} company. Please try again later.`);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedOption) {
+            fetchData();
+        }
+    }, [selectedOption]);
+
+    return (
+        <div>
+            <Navbar />
+            <div className="max-w-6xl mx-auto my-10">
+                <Label className="text-4xl font-bold">Admin <span className="text-[#F83002]">Dashboard</span></Label>
+                <div className="flex items-center justify-between my-5">
+                    <Select onValueChange={handleSelect}>
+                        <SelectTrigger className="w-[180px] my-7">
+                            <SelectValue placeholder="Get Details" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectItem value="student">User</SelectItem>
+                                <SelectItem value="recruiter">Jobs</SelectItem>
+                                <SelectItem value="companies">Companies</SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                    <Button className="bg-[#F83002]" onClick={fetchData} disabled={loading}>
+                        {loading ? "Loading..." : "View Details"}
+                    </Button>
+                </div>
+
+                {/* Display any error message */}
+                {error && <div className="text-red-500 mb-4">{error}</div>}
+
+                {/* Render Data Tables */}
+                {selectedOption === "companies" && (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Company Name</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Update Status</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {companies.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan="4" className="text-center">No companies available</TableCell>
+                                </TableRow>
+                            ) : (
+                                companies.map((company) => (
+                                    <TableRow key={company._id}>
+                                        <TableCell>{company.name}</TableCell>
+                                        <TableCell>{company.status}</TableCell>
+                                        <TableCell className="text-right">
+                                            {company.status === "pending" ? (
+                                                <div className="space-x-2">
+                                                    <Button onClick={() => handleAcceptOrRejectCompany(company._id, "accepted")} className="bg-green-500">Accept</Button>
+                                                    <Button onClick={() => handleAcceptOrRejectCompany(company._id, "rejected")} className="bg-red-500">Reject</Button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-500">Already Updated</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right text-red-500 cursor-pointer" onClick={() => handleRemoveCompany(company._id)}>Remove</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+
+                {/* Add additional tables for "student" and "recruiter" options */}
+                {selectedOption === "student" && (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User Name</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Phone No.</TableHead>
+                                <TableHead>Education Qualification</TableHead>
+                                <TableHead>Year of Passing</TableHead>
+                                <TableHead>Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {users.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan="2" className="text-center">No students available</TableCell>
+                                </TableRow>
+                            ) : (
+                                users.filter((user) => user.role !== "admin").map((user) => (
+                                    <TableRow key={user._id}>
+                                        <TableCell>{user.fullname ? user.fullname : "NA"}</TableCell>
+                                        <TableCell>{user.role ? user.role : "NA"}</TableCell>
+                                        <TableCell>{user.email ? user.email : "NA"}</TableCell>
+                                        <TableCell>{user.phoneNumber ? user.phoneNumber : "NA"}</TableCell>
+                                        <TableCell>{user.profile.educationalQualification ? user.profile.educationalQualification : "NA"}</TableCell>
+                                        <TableCell>{user.profile.yearOfPassing ? user.profile.yearOfPassing : "NA"}</TableCell>
+                                        <TableCell className="text-red-500 cursor-pointer">Remove</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+
+                {selectedOption === "recruiter" && (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Company Name</TableHead>
+                                <TableHead>Job Title</TableHead>
+                                <TableHead>Salary (in LPA)</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Job Type</TableHead>
+                                <TableHead>Experience Level</TableHead>
+                                <TableHead>Position</TableHead>
+                                <TableHead>createdAt</TableHead>
+                                <TableHead>updatedAt</TableHead>
+                                <TableHead>Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        
+                        <TableBody>
+                            {jobs.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan="2" className="text-center">No job listings available</TableCell>
+                                </TableRow>
+                            ) : (
+                                jobs.map((job) => (
+                                   
+                            <TableRow key={job._id}>
+
+                                <TableCell>{job?.company?.name ?? "NA"}</TableCell>
+                                <TableCell>{job.title}</TableCell>
+                                <TableCell>{job.salary}</TableCell>
+                                <TableCell>{job.location}</TableCell>
+                                <TableCell>{job.jobType}</TableCell>
+                                <TableCell>{job.experienceLevel}</TableCell>
+                                <TableCell>{job.position}</TableCell>
+                                <TableCell>{job.createdAt ? job.createdAt.toLocaleString() : "NA"}</TableCell>
+                                <TableCell>{job.updatedAt ? job.updatedAt.toLocaleString() : "NA"}</TableCell>
+                                <TableCell className="text-red-500 cursor-pointer">Remove</TableCell>
+                            </TableRow>
+                            ))
+                            )}
+                        </TableBody>
+                    </Table>
+                )} 
+
+            </div>
+
+            {/* Confirmation Modal */}
+            {isModalOpen && (
+                <div className="modal">
+                    <div className="modal-content">
+                        <p>Are you sure you want to remove this company?</p>
+                        <Button onClick={confirmRemove}>Yes</Button>
+                        <Button onClick={() => setIsModalOpen(false)}>No</Button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default AdminHomePage;
